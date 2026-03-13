@@ -1,42 +1,106 @@
-import { Search, Filter, Plus } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { VendorHub } from "./vendor-hub";
 
-export default function VendorsPage() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-navy">Vendor Hub</h1>
-          <p className="mt-1 text-navy-400">
-            Browse and manage all tracked vendors
-          </p>
-        </div>
-        <button className="flex items-center gap-2 rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-600">
-          <Plus size={16} />
-          Add Vendor
-        </button>
-      </div>
+// Derive vendor type from name/website patterns
+function deriveVendorType(
+  name: string,
+  website: string | null
+): "commercial" | "open-source" | "open-core" {
+  const n = name.toLowerCase();
+  const w = (website ?? "").toLowerCase();
+  if (
+    n.startsWith("apache ") ||
+    n === "mlflow (oss)" ||
+    w.includes("apache.org")
+  ) {
+    return "open-source";
+  }
+  if (
+    ["airbyte", "metabase", "clickhouse", "redpanda", "minio", "datahub", "great expectations", "soda", "prefect", "tyk", "gravitee", "rudderstack"].some(
+      (k) => n.toLowerCase().includes(k)
+    )
+  ) {
+    return "open-core";
+  }
+  return "commercial";
+}
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
-          <input
-            type="text"
-            placeholder="Search vendors..."
-            className="w-full rounded-lg border border-navy-100 bg-white py-2 pl-10 pr-4 text-sm focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-          />
-        </div>
-        <button className="flex items-center gap-2 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm text-navy-400 hover:bg-navy-50">
-          <Filter size={16} />
-          Filters
-        </button>
-      </div>
+export default async function VendorsPage() {
+  const [vendors, categories] = await Promise.all([
+    prisma.vendor.findMany({
+      include: {
+        categories: {
+          include: { category: true },
+        },
+        products: {
+          select: { id: true, pricingModel: true },
+        },
+        scores: {
+          include: { criterion: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.category.findMany({
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
 
-      <div className="rounded-xl border border-navy-100 bg-white p-8 text-center shadow-sm">
-        <p className="text-navy-400">
-          Vendor data will be displayed here. Connect your database to get
-          started.
-        </p>
-      </div>
-    </div>
-  );
+  // Transform to serializable shape with computed overall score
+  const vendorData = vendors.map((v) => {
+    // Weighted average score → normalize to 0-100
+    let overallScore = 0;
+    if (v.scores.length > 0) {
+      const totalWeight = v.scores.reduce(
+        (sum, s) => sum + s.criterion.weight,
+        0
+      );
+      const weightedSum = v.scores.reduce(
+        (sum, s) => sum + s.score * s.criterion.weight * s.confidence,
+        0
+      );
+      overallScore =
+        totalWeight > 0
+          ? Math.round((weightedSum / totalWeight) * 10) // scores are 0-10, scale to 0-100
+          : 0;
+    }
+
+    const primaryCat = v.categories.find((vc) => vc.isPrimary)?.category ??
+      v.categories[0]?.category ?? null;
+
+    const type = deriveVendorType(v.name, v.website);
+
+    const pricingModel =
+      v.products[0]?.pricingModel ?? (type === "open-source" ? "free" : "enterprise");
+
+    return {
+      id: v.id,
+      name: v.name,
+      slug: v.slug,
+      description: v.description,
+      website: v.website,
+      logoUrl: v.logoUrl,
+      tier: v.tier,
+      type,
+      founded: v.founded,
+      hqLocation: v.hqLocation,
+      employeeRange: v.employeeRange,
+      overallScore,
+      pricingModel,
+      primaryCategory: primaryCat
+        ? { id: primaryCat.id, name: primaryCat.name, slug: primaryCat.slug, color: primaryCat.color }
+        : null,
+      categoryCount: v.categories.length,
+      productCount: v.products.length,
+    };
+  });
+
+  const categoryOptions = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    color: c.color,
+  }));
+
+  return <VendorHub vendors={vendorData} categories={categoryOptions} />;
 }
