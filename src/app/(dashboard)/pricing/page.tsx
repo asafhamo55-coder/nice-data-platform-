@@ -1,58 +1,53 @@
-import { Calculator, DollarSign } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { PricingHub } from "./pricing-hub";
 
-export default function PricingPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-navy">Pricing Calculator</h1>
-        <p className="mt-1 text-navy-400">
-          Compare vendor pricing and estimate costs
-        </p>
-      </div>
+export default async function PricingPage() {
+  const [vendors, categories] = await Promise.all([
+    prisma.vendor.findMany({
+      include: {
+        products: { select: { id: true, pricingModel: true }, take: 1 },
+        categories: {
+          where: { isPrimary: true },
+          include: { category: { select: { id: true, name: true, slug: true, color: true } } },
+          take: 1,
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.category.findMany({ orderBy: { sortOrder: "asc" } }),
+  ]);
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
-            <Calculator size={20} />
-            Cost Estimator
-          </h2>
-          <p className="mt-2 text-sm text-navy-400">
-            Configure your usage parameters to estimate costs across vendors.
-          </p>
-          <div className="mt-4 space-y-4">
-            <div>
-              <label className="text-sm font-medium text-navy">
-                Data Volume (TB/month)
-              </label>
-              <input
-                type="number"
-                placeholder="10"
-                className="mt-1 w-full rounded-lg border border-navy-100 px-3 py-2 text-sm focus:border-blue focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-navy">
-                Concurrent Users
-              </label>
-              <input
-                type="number"
-                placeholder="100"
-                className="mt-1 w-full rounded-lg border border-navy-100 px-3 py-2 text-sm focus:border-blue focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
+  // Derive vendor type
+  function deriveType(name: string, website: string | null): string {
+    const n = name.toLowerCase();
+    const w = (website ?? "").toLowerCase();
+    if (n.startsWith("apache ") || n === "mlflow (oss)" || w.includes("apache.org")) return "open-source";
+    if (["airbyte", "metabase", "clickhouse", "redpanda", "minio", "datahub", "great expectations", "soda", "prefect", "tyk", "gravitee", "rudderstack"].some(k => n.includes(k))) return "open-core";
+    return "commercial";
+  }
 
-        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
-            <DollarSign size={20} />
-            Price Comparison
-          </h2>
-          <p className="mt-2 text-sm text-navy-400">
-            Pricing comparison results will appear here after configuration.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  const vendorData = vendors.map((v) => {
+    const type = deriveType(v.name, v.website);
+    const pricingModel = v.products[0]?.pricingModel ?? (type === "open-source" ? "free" : "enterprise");
+    const primaryCat = v.categories[0]?.category ?? null;
+
+    return {
+      vendorId: v.id,
+      vendorName: v.name,
+      vendorSlug: v.slug,
+      tier: v.tier,
+      pricingModel,
+      category: primaryCat?.name ?? "Uncategorized",
+      categoryId: primaryCat?.id ?? "",
+      categoryColor: primaryCat?.color ?? null,
+    };
+  });
+
+  const categoryOptions = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+  }));
+
+  return <PricingHub vendors={vendorData} categories={categoryOptions} />;
 }
