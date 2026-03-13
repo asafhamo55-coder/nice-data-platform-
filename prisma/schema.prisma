@@ -10,25 +10,32 @@ datasource db {
 // ─── Vendor Management ────────────────────────────────────────
 
 model Vendor {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  website     String?
-  logoUrl     String?
-  founded     Int?
-  hqLocation  String?
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  website       String?
+  logoUrl       String?
+  founded       Int?
+  hqLocation    String?
   employeeRange String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  marketCap     String?
+  revenue       String?
+  tier          String   @default("emerging") // leader, challenger, emerging, niche
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   categories  VendorCategory[]
+  products    Product[]
   scores      VendorScore[]
+  benchmarks  BenchmarkResult[]
   evaluations Evaluation[]
   news        NewsItem[]
 
   @@map("vendors")
 }
+
+// ─── Categories ───────────────────────────────────────────────
 
 model Category {
   id          String   @id @default(cuid())
@@ -36,12 +43,15 @@ model Category {
   slug        String   @unique
   description String?
   icon        String?
+  color       String?
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  vendors     VendorCategory[]
-  criteria    Criterion[]
+  vendors    VendorCategory[]
+  criteria   Criterion[]
+  benchmarks Benchmark[]
+  news       NewsItem[]  @relation("CategoryNews")
 
   @@map("categories")
 }
@@ -50,6 +60,7 @@ model VendorCategory {
   id         String   @id @default(cuid())
   vendorId   String
   categoryId String
+  isPrimary  Boolean  @default(false)
   vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
@@ -57,34 +68,105 @@ model VendorCategory {
   @@map("vendor_categories")
 }
 
+// ─── Products & Capabilities ──────────────────────────────────
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String
+  vendorId     String
+  description  String?
+  pricingModel String?
+  pricingUrl   String?
+  tier         String?  // free, starter, pro, enterprise
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor       Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  capabilities Capability[]
+
+  @@unique([vendorId, slug])
+  @@map("products")
+}
+
+model Capability {
+  id          String  @id @default(cuid())
+  name        String
+  key         String
+  productId   String
+  description String?
+  maturity    String  @default("ga") // preview, ga, mature, deprecated
+  rating      Float?  // 1-10
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, key])
+  @@map("capabilities")
+}
+
 // ─── Scoring & Rankings ───────────────────────────────────────
 
 model Criterion {
-  id         String   @id @default(cuid())
-  name       String
-  key        String
-  weight     Float    @default(1.0)
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  scores     VendorScore[]
+  id          String   @id @default(cuid())
+  name        String
+  key         String
+  description String?
+  weight      Float    @default(1.0)
+  maxScore    Float    @default(10.0)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  scores      VendorScore[]
 
   @@unique([key, categoryId])
   @@map("criteria")
 }
 
 model VendorScore {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   vendorId    String
   criterionId String
   score       Float
-  confidence  Float     @default(0.5)
+  confidence  Float    @default(0.5)
   source      String?
-  scoredAt    DateTime  @default(now())
+  notes       String?
+  scoredAt    DateTime @default(now())
   vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   criterion   Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, criterionId])
   @@map("vendor_scores")
+}
+
+// ─── Benchmarks ───────────────────────────────────────────────
+
+model Benchmark {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique
+  description String?
+  unit        String?  // ms, tps, gb, score
+  higherIsBetter Boolean @default(true)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  results     BenchmarkResult[]
+
+  @@map("benchmarks")
+}
+
+model BenchmarkResult {
+  id          String   @id @default(cuid())
+  benchmarkId String
+  vendorId    String
+  value       Float
+  testDate    DateTime @default(now())
+  environment String?
+  notes       String?
+
+  benchmark Benchmark @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([benchmarkId, vendorId])
+  @@map("benchmark_results")
 }
 
 // ─── Evaluations ──────────────────────────────────────────────
@@ -93,9 +175,11 @@ model Evaluation {
   id          String   @id @default(cuid())
   title       String
   vendorId    String
-  status      String   @default("draft")
+  status      String   @default("draft") // draft, in_progress, completed, archived
   criteria    Json     @default("[]")
   results     Json     @default("{}")
+  summary     String?
+  score       Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -111,11 +195,15 @@ model NewsItem {
   summary     String?
   url         String
   source      String?
+  imageUrl    String?
+  sentiment   String?  // positive, neutral, negative
   publishedAt DateTime
   vendorId    String?
-  vendor      Vendor?  @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  tags        String[] @default([])
-  createdAt   DateTime @default(now())
+  categoryId  String?
+  vendor      Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  category    Category? @relation("CategoryNews", fields: [categoryId], references: [id], onDelete: SetNull)
+  tags        String[]  @default([])
+  createdAt   DateTime  @default(now())
 
   @@map("news_items")
 }
@@ -127,8 +215,9 @@ model Standard {
   title       String
   slug        String   @unique
   content     String
-  type        String   @default("standard")
+  type        String   @default("standard") // standard, playbook, checklist, template
   version     String   @default("1.0")
+  status      String   @default("active")   // draft, active, deprecated
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
