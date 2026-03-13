@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* NICE Theme Colors */
+  --color-navy: #1B2A4A;
+  --color-blue: #2E75B6;
+  --color-accent: #00B4D8;
+  --color-dark: #0D1B2A;
+  --color-light: #F0F7FF;
+
+  --color-navy-50: #f0f3f8;
+  --color-navy-100: #d9e0ed;
+  --color-navy-200: #b3c1db;
+  --color-navy-300: #8da2c9;
+  --color-navy-400: #5476a9;
+  --color-navy-500: #1B2A4A;
+  --color-navy-600: #172340;
+  --color-navy-700: #131d35;
+  --color-navy-800: #0f162a;
+  --color-navy-900: #0b101f;
+
+  --color-blue-50: #eef5fb;
+  --color-blue-100: #d4e4f4;
+  --color-blue-200: #a9c9e9;
+  --color-blue-300: #7eaede;
+  --color-blue-400: #5393d3;
+  --color-blue-500: #2E75B6;
+  --color-blue-600: #265e92;
+  --color-blue-700: #1d466d;
+  --color-blue-800: #132f49;
+  --color-blue-900: #0a1724;
+
+  --color-accent-50: #e6f9fc;
+  --color-accent-100: #b3eef7;
+  --color-accent-200: #80e3f2;
+  --color-accent-300: #4dd8ed;
+  --color-accent-400: #1acde8;
+  --color-accent-500: #00B4D8;
+  --color-accent-600: #0090ad;
+  --color-accent-700: #006c82;
+  --color-accent-800: #004856;
+  --color-accent-900: #00242b;
+
+  /* shadcn/ui CSS variables */
+  --radius: 0.625rem;
+}
+
+:root {
+  --background: #F0F7FF;
+  --foreground: #0D1B2A;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0D1B2A;
+    --foreground: #F0F7FF;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

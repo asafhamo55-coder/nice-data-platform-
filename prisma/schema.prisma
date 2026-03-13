@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Vendor Management ────────────────────────────────────────
+
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  website     String?
+  logoUrl     String?
+  founded     Int?
+  hqLocation  String?
+  employeeRange String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categories  VendorCategory[]
+  scores      VendorScore[]
+  evaluations Evaluation[]
+  news        NewsItem[]
+
+  @@map("vendors")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendors     VendorCategory[]
+  criteria    Criterion[]
+
+  @@map("categories")
+}
+
+model VendorCategory {
+  id         String   @id @default(cuid())
+  vendorId   String
+  categoryId String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, categoryId])
+  @@map("vendor_categories")
+}
+
+// ─── Scoring & Rankings ───────────────────────────────────────
+
+model Criterion {
+  id         String   @id @default(cuid())
+  name       String
+  key        String
+  weight     Float    @default(1.0)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  scores     VendorScore[]
+
+  @@unique([key, categoryId])
+  @@map("criteria")
+}
+
+model VendorScore {
+  id          String    @id @default(cuid())
+  vendorId    String
+  criterionId String
+  score       Float
+  confidence  Float     @default(0.5)
+  source      String?
+  scoredAt    DateTime  @default(now())
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  criterion   Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, criterionId])
+  @@map("vendor_scores")
+}
+
+// ─── Evaluations ──────────────────────────────────────────────
+
+model Evaluation {
+  id          String   @id @default(cuid())
+  title       String
+  vendorId    String
+  status      String   @default("draft")
+  criteria    Json     @default("[]")
+  results     Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("evaluations")
+}
+
+// ─── News & Content ───────────────────────────────────────────
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String?
+  url         String
+  source      String?
+  publishedAt DateTime
+  vendorId    String?
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+
+  @@map("news_items")
+}
+
+// ─── Standards & Playbooks ────────────────────────────────────
+
+model Standard {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  content     String
+  type        String   @default("standard")
+  version     String   @default("1.0")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("standards")
+}
