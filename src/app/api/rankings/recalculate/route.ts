@@ -3,34 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { rankVendorsInCategory, computeGlobalRankings } from "@/lib/scoring";
 import type { CriterionScore } from "@/lib/scoring";
 
-export async function GET() {
-  // Return current stored rankings
-  const vendors = await prisma.vendor.findMany({
-    where: { overallScore: { not: null } },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      tier: true,
-      overallScore: true,
-      overallRank: true,
-      categories: {
-        select: {
-          categoryScore: true,
-          categoryRank: true,
-          category: { select: { id: true, name: true, slug: true, color: true } },
-        },
-      },
-    },
-    orderBy: { overallRank: "asc" },
-  });
-
-  return NextResponse.json({ rankings: vendors, total: vendors.length });
-}
-
+/**
+ * POST /api/rankings/recalculate
+ * Recalculates all vendor scores and ranks:
+ * - Updates VendorCategory.categoryScore and categoryRank per category
+ * - Updates Vendor.overallScore and overallRank globally
+ */
 export async function POST() {
   try {
-    // Fetch all categories with criteria
     const categories = await prisma.category.findMany({
       include: {
         criteria: true,
@@ -57,7 +37,8 @@ export async function POST() {
       color: string | null;
     }>();
 
-    // Process each category
+    let vendorCategoryUpdates = 0;
+
     for (const cat of categories) {
       const criterionIds = new Set(cat.criteria.map((c) => c.id));
       const totalWeight = cat.criteria.reduce((sum, c) => sum + c.weight, 0);
@@ -85,19 +66,19 @@ export async function POST() {
       const rankings = rankVendorsInCategory(vendorScores, cat.id, cat.name);
       categoryRankingsMap.set(cat.id, { rankings, totalWeight, color: cat.color });
 
-      // Update VendorCategory records with categoryScore and categoryRank
+      // Update VendorCategory records
       for (const r of rankings) {
         await prisma.vendorCategory.updateMany({
           where: { vendorId: r.vendorId, categoryId: cat.id },
           data: { categoryScore: r.normalizedScore, categoryRank: r.rank },
         });
+        vendorCategoryUpdates++;
       }
     }
 
-    // Compute global rankings
+    // Compute and persist global rankings
     const globalRankings = computeGlobalRankings(categoryRankingsMap);
 
-    // Update Vendor records with overallScore and overallRank
     for (const r of globalRankings) {
       await prisma.vendor.update({
         where: { id: r.vendorId },
@@ -107,9 +88,11 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
+      timestamp: new Date().toISOString(),
       categoriesProcessed: categories.length,
       vendorsRanked: globalRankings.length,
-      topVendors: globalRankings.slice(0, 5).map((r) => ({
+      vendorCategoryUpdates,
+      topVendors: globalRankings.slice(0, 10).map((r) => ({
         name: r.vendorName,
         score: r.overallScore,
         rank: r.overallRank,

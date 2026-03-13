@@ -22,6 +22,8 @@ model Vendor {
   marketCap     String?
   revenue       String?
   tier          String   @default("emerging") // leader, challenger, emerging, niche
+  overallScore  Float?
+  overallRank   Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -60,9 +62,11 @@ model VendorCategory {
   id         String   @id @default(cuid())
   vendorId   String
   categoryId String
-  isPrimary  Boolean  @default(false)
-  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  isPrimary     Boolean  @default(false)
+  categoryScore Float?
+  categoryRank  Int?
+  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category      Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, categoryId])
   @@map("vendor_categories")

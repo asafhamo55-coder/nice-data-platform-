@@ -1,6 +1,14 @@
 export {
   calculateWeightedScore,
-  rankVendors,
   normalizeScore,
+  rankVendorsInCategory,
+  computeGlobalRankings,
+  globalRankingsToCsv,
+  categoryRankingsToCsv,
 } from "./engine";
-export type { CriterionScore, VendorRanking } from "./engine";
+export type {
+  CriterionScore,
+  VendorCategoryRanking,
+  VendorGlobalRanking,
+  WeightOverride,
+} from "./engine";
