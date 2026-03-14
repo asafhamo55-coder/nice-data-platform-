@@ -5,3 +5,4 @@ export { scoreVendor } from "./scoring-agent";
 export { estimatePricing } from "./pricing-agent";
 export { chat } from "./chat-assistant";
 export { scoutVendors } from "./vendor-scout";
+export { runFullRefresh } from "./data-refresh-engine";

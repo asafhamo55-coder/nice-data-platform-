@@ -260,21 +260,46 @@ function NavLink({
   );
 }
 
+// ─── Refresh progress types ─────────────────────────────────
+
+interface RefreshProgress {
+  step: number;
+  totalSteps: number;
+  name: string;
+  status: string;
+  detail?: string;
+}
+
+interface RefreshResult {
+  status: "completed" | "partial" | "failed";
+  newsCollected: number;
+  newVendorsCreated: number;
+  vendorsUpdated: number;
+  qualityIssues: { vendorName: string; detail: string }[];
+  totalDurationMs: number;
+}
+
 // ─── Top Header ──────────────────────────────────────────────
 
 function TopHeader({
   onMenuOpen,
   isRefreshing,
+  refreshProgress,
+  refreshResult,
   onRefresh,
+  onDismissResult,
 }: {
   onMenuOpen: () => void;
   isRefreshing: boolean;
+  refreshProgress: RefreshProgress | null;
+  refreshResult: RefreshResult | null;
   onRefresh: () => void;
+  onDismissResult: () => void;
 }) {
   const [searchFocused, setSearchFocused] = useState(false);
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-navy-100 bg-white px-4 lg:px-6">
+    <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-navy-100 bg-white px-4 lg:px-6">
       {/* Mobile menu button */}
       <button
         onClick={onMenuOpen}
@@ -311,23 +336,95 @@ function TopHeader({
       {/* Right actions */}
       <div className="flex items-center gap-1">
         {/* Refresh Data */}
-        <button
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className={cn(
-            "nav-transition flex items-center gap-2 rounded-lg border border-navy-100 px-3 py-2 text-xs font-medium",
-            "hover:border-blue hover:text-blue",
-            isRefreshing
-              ? "cursor-not-allowed text-navy-300"
-              : "text-navy-500"
+        <div className="relative">
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "nav-transition flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+              isRefreshing
+                ? "cursor-not-allowed border-blue/30 bg-blue-50 text-blue"
+                : "border-navy-100 text-navy-500 hover:border-blue hover:text-blue"
+            )}
+          >
+            <RefreshCw
+              size={14}
+              className={cn(isRefreshing && "animate-spin")}
+            />
+            {isRefreshing && refreshProgress ? (
+              <span className="hidden sm:inline">
+                {refreshProgress.step}/{refreshProgress.totalSteps}{" "}
+                {refreshProgress.name}
+              </span>
+            ) : (
+              <span className="hidden sm:inline">Refresh Data</span>
+            )}
+          </button>
+
+          {/* Progress bar under the button */}
+          {isRefreshing && refreshProgress && (
+            <div className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-navy-100">
+              <div
+                className="nav-transition h-full rounded-full bg-blue"
+                style={{
+                  width: `${(refreshProgress.step / refreshProgress.totalSteps) * 100}%`,
+                }}
+              />
+            </div>
           )}
-        >
-          <RefreshCw
-            size={14}
-            className={cn(isRefreshing && "animate-spin")}
-          />
-          <span className="hidden sm:inline">Refresh Data</span>
-        </button>
+
+          {/* Result toast */}
+          {refreshResult && !isRefreshing && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-navy-100 bg-white p-4 shadow-lg">
+              <div className="mb-2 flex items-center justify-between">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                    refreshResult.status === "completed"
+                      ? "bg-emerald-50 text-emerald-600"
+                      : refreshResult.status === "partial"
+                        ? "bg-amber-50 text-amber-600"
+                        : "bg-red-50 text-red-600"
+                  )}
+                >
+                  {refreshResult.status}
+                </span>
+                <button
+                  onClick={onDismissResult}
+                  className="rounded p-0.5 text-navy-300 hover:text-navy"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+
+              <div className="space-y-1.5 text-[11px] text-navy-500">
+                {refreshResult.newsCollected > 0 && (
+                  <p>
+                    <span className="font-semibold text-navy">{refreshResult.newsCollected}</span> news articles collected
+                  </p>
+                )}
+                {refreshResult.newVendorsCreated > 0 && (
+                  <p>
+                    <span className="font-semibold text-navy">{refreshResult.newVendorsCreated}</span> new vendors discovered
+                  </p>
+                )}
+                {refreshResult.vendorsUpdated > 0 && (
+                  <p>
+                    <span className="font-semibold text-navy">{refreshResult.vendorsUpdated}</span> vendors updated
+                  </p>
+                )}
+                {refreshResult.qualityIssues.length > 0 && (
+                  <p className="text-amber-600">
+                    {refreshResult.qualityIssues.length} quality issues found
+                  </p>
+                )}
+                <p className="pt-1 text-[10px] text-navy-300">
+                  Completed in {(refreshResult.totalDurationMs / 1000).toFixed(1)}s
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Notifications */}
         <button className="nav-transition relative rounded-lg p-2 text-navy-400 hover:bg-navy-50 hover:text-navy">
@@ -426,24 +523,80 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState<RefreshProgress | null>(null);
+  const [refreshResult, setRefreshResult] = useState<RefreshResult | null>(null);
 
   const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
     setIsRefreshing(true);
+    setRefreshProgress(null);
+    setRefreshResult(null);
+
     try {
-      const [scoutRes, newsRes] = await Promise.all([
-        fetch("/api/agents/vendor-scout/trigger", { method: "POST" }),
-        fetch("/api/agents/news-collector/trigger", { method: "POST" }),
-      ]);
-      const scoutData = scoutRes.ok ? await scoutRes.json() : null;
-      const newsData = newsRes.ok ? await newsRes.json() : null;
-      console.log("[Refresh] Vendor scout:", scoutData);
-      console.log("[Refresh] News collector:", newsData);
+      const res = await fetch("/api/agents/refresh-all", { method: "POST" });
+      if (!res.ok) throw new Error("Refresh request failed");
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "step") {
+              setRefreshProgress({
+                step: event.step,
+                totalSteps: event.totalSteps,
+                name: event.name,
+                status: event.status,
+                detail: event.detail,
+              });
+            } else if (event.type === "summary") {
+              setRefreshResult({
+                status: event.status,
+                newsCollected: event.newsCollected ?? 0,
+                newVendorsCreated: event.newVendorsCreated ?? 0,
+                vendorsUpdated: event.vendorsUpdated ?? 0,
+                qualityIssues: event.qualityIssues ?? [],
+                totalDurationMs: event.totalDurationMs ?? 0,
+              });
+            } else if (event.type === "error") {
+              console.error("[Refresh] Error:", event.error);
+            }
+          } catch {
+            // skip malformed JSON
+          }
+        }
+      }
     } catch (err) {
       console.error("[Refresh] Failed:", err);
     } finally {
       setIsRefreshing(false);
+      setRefreshProgress(null);
     }
+  }, [isRefreshing]);
+
+  const handleDismissResult = useCallback(() => {
+    setRefreshResult(null);
   }, []);
+
+  // Auto-dismiss result after 10 seconds
+  useEffect(() => {
+    if (!refreshResult) return;
+    const timer = setTimeout(() => setRefreshResult(null), 10000);
+    return () => clearTimeout(timer);
+  }, [refreshResult]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -469,7 +622,10 @@ export default function DashboardLayout({
         <TopHeader
           onMenuOpen={() => setMobileMenuOpen(true)}
           isRefreshing={isRefreshing}
+          refreshProgress={refreshProgress}
+          refreshResult={refreshResult}
           onRefresh={handleRefresh}
+          onDismissResult={handleDismissResult}
         />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">{children}</div>
