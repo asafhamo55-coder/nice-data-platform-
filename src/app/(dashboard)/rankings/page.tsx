@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { rankVendorsInCategory, computeGlobalRankings } from "@/lib/scoring";
 import type { CriterionScore } from "@/lib/scoring";
