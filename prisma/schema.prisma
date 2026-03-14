@@ -216,6 +216,23 @@ model NewsItem {
   @@map("news_items")
 }
 
+// ─── Agent Runs ──────────────────────────────────────────────
+
+model AgentRun {
+  id          String   @id @default(cuid())
+  agent       String   // e.g. "news-collector", "vendor-research"
+  status      String   @default("running") // running, completed, failed
+  input       Json     @default("{}")
+  output      Json     @default("{}")
+  itemsFound  Int      @default(0)
+  error       String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+
+  @@map("agent_runs")
+}
+
 // ─── Standards & Playbooks ────────────────────────────────────
 
 model Standard {
