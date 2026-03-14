@@ -194,20 +194,24 @@ model Evaluation {
 // ─── News & Content ───────────────────────────────────────────
 
 model NewsItem {
-  id          String   @id @default(cuid())
-  title       String
-  summary     String?
-  url         String
-  source      String?
-  imageUrl    String?
-  sentiment   String?  // positive, neutral, negative
-  publishedAt DateTime
-  vendorId    String?
-  categoryId  String?
-  vendor      Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  category    Category? @relation("CategoryNews", fields: [categoryId], references: [id], onDelete: SetNull)
-  tags        String[]  @default([])
-  createdAt   DateTime  @default(now())
+  id           String   @id @default(cuid())
+  title        String
+  summary      String?
+  url          String
+  source       String?
+  sourceIcon   String?
+  imageUrl     String?
+  newsCategory String   @default("general") // product_launch, funding, partnership, acquisition, industry_report, regulation, open_source, benchmark, migration, general
+  sentiment    String?  // positive, neutral, negative
+  relevance    Int      @default(5) // 1-10
+  bookmarked   Boolean  @default(false)
+  publishedAt  DateTime
+  vendorId     String?
+  categoryId   String?
+  vendor       Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  category     Category? @relation("CategoryNews", fields: [categoryId], references: [id], onDelete: SetNull)
+  tags         String[]  @default([])
+  createdAt    DateTime  @default(now())
 
   @@map("news_items")
 }
