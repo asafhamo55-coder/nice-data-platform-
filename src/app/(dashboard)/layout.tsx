@@ -427,9 +427,22 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 2000);
+    try {
+      const [scoutRes, newsRes] = await Promise.all([
+        fetch("/api/agents/vendor-scout/trigger", { method: "POST" }),
+        fetch("/api/agents/news-collector/trigger", { method: "POST" }),
+      ]);
+      const scoutData = scoutRes.ok ? await scoutRes.json() : null;
+      const newsData = newsRes.ok ? await newsRes.json() : null;
+      console.log("[Refresh] Vendor scout:", scoutData);
+      console.log("[Refresh] News collector:", newsData);
+    } catch (err) {
+      console.error("[Refresh] Failed:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
 
   // Close mobile menu on route change
