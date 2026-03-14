@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -31,6 +32,8 @@ import {
   Layers,
   Cpu,
   Zap,
+  Sun,
+  Moon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -296,7 +299,13 @@ function TopHeader({
   onRefresh: () => void;
   onDismissResult: () => void;
 }) {
-  const [searchFocused, setSearchFocused] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const openSearch = useCallback(() => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+  }, []);
 
   return (
     <header className="relative flex h-16 shrink-0 items-center gap-4 border-b border-navy-100 bg-white px-4 lg:px-6">
@@ -308,30 +317,18 @@ function TopHeader({
         <Menu size={20} />
       </button>
 
-      {/* Search */}
-      <div className="relative flex-1 max-w-xl">
-        <Search
-          size={16}
-          className={cn(
-            "absolute left-3 top-1/2 -translate-y-1/2 nav-transition",
-            searchFocused ? "text-blue" : "text-navy-300"
-          )}
-        />
-        <input
-          type="text"
-          placeholder="Search vendors, categories, or metrics..."
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-          className={cn(
-            "nav-transition w-full rounded-lg border bg-navy-50/50 py-2 pl-9 pr-4 text-sm text-navy placeholder:text-navy-300",
-            "focus:border-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue/20",
-            searchFocused ? "border-blue" : "border-navy-100"
-          )}
-        />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-navy-200 bg-navy-50 px-1.5 py-0.5 text-[10px] font-medium text-navy-400 sm:inline-block">
+      {/* Search trigger (opens Cmd+K palette) */}
+      <button
+        onClick={openSearch}
+        className="nav-transition flex flex-1 max-w-xl items-center gap-2 rounded-lg border border-navy-100 bg-navy-50/50 px-3 py-2 text-sm text-navy-300 hover:border-blue hover:text-navy-400"
+      >
+        <Search size={16} className="flex-shrink-0" />
+        <span className="flex-1 text-left hidden sm:inline">Search vendors, categories, or metrics...</span>
+        <span className="flex-1 text-left sm:hidden">Search...</span>
+        <kbd className="hidden rounded border border-navy-200 bg-navy-50 px-1.5 py-0.5 text-[10px] font-medium text-navy-400 sm:inline-block">
           ⌘K
         </kbd>
-      </div>
+      </button>
 
       {/* Right actions */}
       <div className="flex items-center gap-1">
@@ -425,6 +422,17 @@ function TopHeader({
             </div>
           )}
         </div>
+
+        {/* Dark mode toggle */}
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="nav-transition rounded-lg p-2 text-navy-400 hover:bg-navy-50 hover:text-navy"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        )}
 
         {/* Notifications */}
         <button className="nav-transition relative rounded-lg p-2 text-navy-400 hover:bg-navy-50 hover:text-navy">

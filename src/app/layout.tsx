@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { GlobalSearch } from "@/components/global-search";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Inter + Plus Jakarta Sans from Google Fonts CDN */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,8 +32,11 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        {children}
-        <Toaster position="bottom-right" />
+        <ThemeProvider>
+          {children}
+          <GlobalSearch />
+          <Toaster position="bottom-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

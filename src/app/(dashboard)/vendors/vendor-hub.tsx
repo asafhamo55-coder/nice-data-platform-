@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   LayoutGrid,
@@ -66,6 +67,7 @@ export function VendorHub({
   vendors: VendorData[];
   categories: CategoryOption[];
 }) {
+  const router = useRouter();
   const [view, setView] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -420,6 +422,7 @@ export function VendorHub({
       {compareIds.size >= 2 && (
         <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
           <button
+            onClick={() => router.push(`/vendors/compare?ids=${[...compareIds].join(",")}`)}
             className="nav-transition flex items-center gap-2.5 rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-navy/30 hover:bg-navy-600"
           >
             <GitCompareArrows size={18} />
